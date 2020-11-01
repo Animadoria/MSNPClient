@@ -1,7 +1,5 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using MSNPClient.Exceptions;
@@ -19,7 +17,7 @@ namespace MSNPClient
         public string Server = "m1.escargot.log1p.xyz";
 
         /// <summary>
-        /// Nexus thingy idk what to type it's nexus okay?
+        /// The passport "Nexus". Original was https://nexus.passport.com/rdr/pprdr.asp
         /// </summary>
         public string Nexus = "https://m1.escargot.log1p.xyz/nexus-mock";
 
@@ -51,8 +49,8 @@ namespace MSNPClient
                 throw new UnsupportedProtocolException();
             }
 
-            // CVR
-            await commandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR lol%20animadoria.%20.is%20.not%20.a%simp MSMSGS " + email);
+            // CVR (with custom version... because why not?)
+            await commandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR 4.20.Blaze.It MSMSGS " + email);
 
             if ((int)ProtocolVersion < 8)
             {
@@ -99,6 +97,11 @@ namespace MSNPClient
 
                 var susr = await commandManager.SendCommandAsync("USR", "TWN S " + ticket);
             }
+        }
+
+        public async Task SetPresence(PresenceStatus status, ClientIdentification identification)
+        {
+            await commandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + identification);
         }
     }
 }
