@@ -8,14 +8,36 @@ using System.Threading.Tasks;
 
 namespace MSNPClient
 {
+    /// <summary>
+    /// The command manager.
+    /// This class manages all the commands.
+    /// </summary>
     public class CommandManager
     {
+        /// <summary>
+        /// The TCP Client.
+        /// </summary>
         readonly TcpClient tcp;
+        /// <summary>
+        /// The network stream.
+        /// </summary>
         readonly NetworkStream networkStream;
+        /// <summary>
+        /// The <c>StreamReader</c>.
+        /// </summary>
         readonly StreamReader reader;
 
+        /// <summary>
+        /// The current TransactionID. Increments every command.
+        /// </summary>
         private int transactionID = 1;
 
+        /// <summary>
+        /// The CommandManager constructor.
+        /// Should be initialized only one time!
+        /// </summary>
+        /// <param name="server">The server to connect to.</param>
+        /// <param name="port">The port to connect to.</param>
         public CommandManager(string server, int port)
         {
             tcp = new TcpClient(server, port);
@@ -23,6 +45,12 @@ namespace MSNPClient
             reader = new StreamReader(networkStream, Encoding.UTF8);
         }
 
+        /// <summary>
+        /// Send a command.
+        /// </summary>
+        /// <param name="command">The command to send.</param>
+        /// <param name="args">The command's arguments. </param>
+        /// <returns>Returns a <c>CommandResult</c> with the command results.</returns>
         public async Task<CommandResult> SendCommandAsync(string command, string args)
         {
             string fullCommand = $"{command} {transactionID} {args}\r\n";
@@ -49,13 +77,5 @@ namespace MSNPClient
             return CommandResult.FromString(result);
         }
 
-        public async IAsyncEnumerable<string> ReadLinesAsync()
-        {
-            string line;
-            while ((line = await reader.ReadLineAsync()) != null)
-            {
-                yield return line;
-            }
-        }
     }
 }

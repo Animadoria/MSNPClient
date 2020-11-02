@@ -31,7 +31,14 @@ namespace MSNPClient
         /// </summary>
         public MSNPVersion ProtocolVersion = MSNPVersion.MSNP12;
 
-        private readonly CommandManager commandManager;
+        /// <summary>
+        /// The command manager. Is created on the main constructor.
+        /// </summary>
+        public readonly CommandManager CommandManager;
+
+        /// <summary>
+        /// Cached email.
+        /// </summary>
         private string email;
 
         /// <summary>
@@ -39,36 +46,50 @@ namespace MSNPClient
         /// </summary>
         public Messenger()
         {
-            commandManager = new CommandManager(Server, Port);
+            CommandManager = new CommandManager(Server, Port);
         }
 
+        /// <summary>
+        /// Connects to the network with the specified credentials.
+        /// </summary>
+        /// <param name="email">The e-mail address.</param>
+        /// <param name="password">The password.</param>
+        /// <returns></returns>
+        /// <example>
+        /// <code>
+        /// Messenger messenger = new Messenger();
+        /// await messenger.Connect("some@email.com", "somepassword");
+        /// </code>
+        /// </example>
+        /// <exception cref="Exceptions.UnsupportedProtocolException">Thrown when the specified protocol is not accepted by the server.</exception>
+        /// <exception cref="InvalidAuthenticationException">Thrown when the specified credentials were not accepted by the server.</exception>
         public async Task Connect(string email, string password)
         {
             this.email = email;   
-            var ver = await commandManager.SendCommandAsync("VER", ProtocolVersion.ToString() + " CVR0");
+            var ver = await CommandManager.SendCommandAsync("VER", ProtocolVersion.ToString() + " CVR0");
             if (ver.ResultArgs.StartsWith("0 "))
             {
                 throw new UnsupportedProtocolException();
             }
 
             // CVR (with custom version... because why not?)
-            await commandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR 4.20.Blaze.It MSMSGS " + email);
+            await CommandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR 4.20.Blaze.It MSMSGS " + email);
 
             if ((int)ProtocolVersion < 8)
             {
                 // INF
-                var inf = await commandManager.SendCommandAsync("INF", string.Empty);
+                var inf = await CommandManager.SendCommandAsync("INF", string.Empty);
 
 
                 // Initial USR
-                var iusr = await commandManager.SendCommandAsync("USR", inf.ResultArgs + " I " + email);
+                var iusr = await CommandManager.SendCommandAsync("USR", inf.ResultArgs + " I " + email);
                 if (iusr.Error && iusr.Command == "911")
                     throw new InvalidAuthenticationException();
 
                 var challenge = iusr.ResultArgs.Split(" ")[2];
 
                 // Second USR
-                var susr = await commandManager.SendCommandAsync("USR", inf.ResultArgs + " S " + (challenge + password).ToMD5().ToLower());
+                var susr = await CommandManager.SendCommandAsync("USR", inf.ResultArgs + " S " + (challenge + password).ToMD5().ToLower());
                 if (susr.Error && susr.Command == "911")
                     throw new InvalidAuthenticationException();
                 
@@ -76,7 +97,7 @@ namespace MSNPClient
             else
             {
                 // Initial USR
-                var iusr = await commandManager.SendCommandAsync("USR", "TWN I " + email);
+                var iusr = await CommandManager.SendCommandAsync("USR", "TWN I " + email);
                 var challenge = iusr.ResultArgs.Split(" ")[2];
 
                 var ticket = "";
@@ -97,23 +118,34 @@ namespace MSNPClient
                     ticket = loginGet.Headers.GetValues("Authentication-Info").First().Split('\'')[1];
                 }
 
-                var susr = await commandManager.SendCommandAsync("USR", "TWN S " + ticket); //Should probably check for OK
+                var susr = await CommandManager.SendCommandAsync("USR", "TWN S " + ticket); //Should probably check for OK
             }
         }
 
-        public async Task SetPresence(PresenceStatus status, ClientIdentification identification)
+        /// <summary>
+        /// Sets the user's presence status and client identification.
+        /// </summary>
+        /// <param name="status">The presence status.</param>
+        /// <param name="identification">The client identification. Default is none.</param>
+        /// <returns></returns>
+        public async Task SetPresence(PresenceStatus status, ClientIdentification identification = ClientIdentification.None)
         {
-            await commandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + identification);
+            await CommandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + identification);
         }
 
+        /// <summary>
+        /// Changes the user's nickname.
+        /// </summary>
+        /// <param name="newName">The new nickname.</param>
+        /// <returns></returns>
         public async Task ChangeNickname(string newName)
         {
             if ((int)ProtocolVersion >= 10)
             {
-                await commandManager.SendCommandAsync("PRP", "MFN " + HttpUtility.UrlPathEncode(newName));
+                await CommandManager.SendCommandAsync("PRP", "MFN " + HttpUtility.UrlPathEncode(newName));
             }
             else
-                await commandManager.SendCommandAsync("REA", email + " " + HttpUtility.UrlPathEncode(newName));
+                await CommandManager.SendCommandAsync("REA", email + " " + HttpUtility.UrlPathEncode(newName));
         }
     }
 }
