@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -33,10 +34,28 @@ namespace MSNPClient
 
             await networkStream.WriteAsync(bytes, 0, bytes.Length);
 
-            var result = await reader.ReadLineAsync();
-            Console.WriteLine("S: " + result);
+            string result = "";
+            string latest;
+            do
+            {
+                var resultBytes = new byte[tcp.ReceiveBufferSize];
+                await networkStream.ReadAsync(resultBytes, 0, tcp.ReceiveBufferSize);
+                latest = Encoding.UTF8.GetString(resultBytes).Split('\0')[0];
+                result += latest;
+            }
+            while (!latest.EndsWith("\r\n"));
 
+            Console.WriteLine("S: " + result);
             return CommandResult.FromString(result);
+        }
+
+        public async IAsyncEnumerable<string> ReadLinesAsync()
+        {
+            string line;
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                yield return line;
+            }
         }
     }
 }

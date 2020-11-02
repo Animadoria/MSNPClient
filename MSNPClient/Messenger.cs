@@ -7,7 +7,7 @@ using MSNPClient.Exceptions;
 namespace MSNPClient
 {
     /// <summary>
-    /// The main client class. Idk what to type i only made this class right now
+    /// The main client class.
     /// </summary>
     public class Messenger
     {
@@ -31,7 +31,8 @@ namespace MSNPClient
         /// </summary>
         public MSNPVersion ProtocolVersion = MSNPVersion.MSNP12;
 
-        private CommandManager commandManager;
+        private readonly CommandManager commandManager;
+        private string email;
 
         /// <summary>
         /// Main constructor. Sets up CommandManager
@@ -43,6 +44,7 @@ namespace MSNPClient
 
         public async Task Connect(string email, string password)
         {
+            this.email = email;   
             var ver = await commandManager.SendCommandAsync("VER", ProtocolVersion.ToString() + " CVR0");
             if (ver.ResultArgs.StartsWith("0 "))
             {
@@ -86,7 +88,7 @@ namespace MSNPClient
 
                     client.DefaultRequestHeaders.Add("Authorization", "Passport1.4 OrgVerb=GET,OrgURL=http%3A%2F%2Fmessenger%2Emsn%2Ecom,sign-in="
                         + HttpUtility.UrlEncode(email) + ",pwd=" + HttpUtility.UrlEncode(password)
-                        + "," + challenge);
+                        + "," + challenge.Replace("\r\n", ""));
 
                     var loginGet = await client.GetAsync(passportUrls);
                     if (loginGet.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -95,13 +97,23 @@ namespace MSNPClient
                     ticket = loginGet.Headers.GetValues("Authentication-Info").First().Split('\'')[1];
                 }
 
-                var susr = await commandManager.SendCommandAsync("USR", "TWN S " + ticket);
+                var susr = await commandManager.SendCommandAsync("USR", "TWN S " + ticket); //Should probably check for OK
             }
         }
 
         public async Task SetPresence(PresenceStatus status, ClientIdentification identification)
         {
             await commandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + identification);
+        }
+
+        public async Task ChangeNickname(string newName)
+        {
+            if ((int)ProtocolVersion >= 10)
+            {
+                await commandManager.SendCommandAsync("PRP", "MFN " + HttpUtility.UrlPathEncode(newName));
+            }
+            else
+                await commandManager.SendCommandAsync("REA", email + " " + HttpUtility.UrlPathEncode(newName));
         }
     }
 }

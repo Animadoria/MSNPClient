@@ -14,18 +14,24 @@ namespace MSNPClient
         {
             var split = input.Split(' ');
 
-            return int.TryParse(split[0], out _)
-                ? new CommandResult()
+            if (int.TryParse(split[0], out _))
+            {
+                return new CommandResult()
                 {
                     Error = true,
                     Command = split[0]
-                }
-                : new CommandResult()
+                };
+            }
+            else
+            {
+                int.TryParse(split[1], out int trID);
+                return new CommandResult
                 {
                     Command = split[0],
-                    TransactionID = int.Parse(split[1]),
-                    ResultArgs = string.Join(' ', split.Skip(2))
+                    TransactionID = trID,
+                    ResultArgs = string.Join(' ', split.Skip(trID == 0 ? 1 : 2))
                 };
+            }
         }
     }
 }

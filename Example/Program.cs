@@ -10,6 +10,8 @@ namespace Example
         {
             Messenger messenger = new Messenger();
             await messenger.Connect("username", "password");
+            await messenger.ChangeNickname("Test nickname");
+            await messenger.SetPresence(PresenceStatus.Busy, ClientIdentification.IsBot | ClientIdentification.MobileOnline);
             await Task.Delay(-1);
         }
     }
