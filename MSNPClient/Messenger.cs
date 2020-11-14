@@ -1,8 +1,11 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web;
 using MSNPClient.Exceptions;
+using Tcp.NET.Client;
+using Tcp.NET.Client.Models;
 
 namespace MSNPClient
 {
@@ -29,12 +32,17 @@ namespace MSNPClient
         /// <summary>
         /// The protocol version.
         /// </summary>
-        public MSNPVersion ProtocolVersion = MSNPVersion.MSNP12;
+        public MSNPVersion ProtocolVersion = MSNPVersion.MSNP2;
 
         /// <summary>
         /// The command manager. Is created on the main constructor.
         /// </summary>
         public readonly CommandManager CommandManager;
+
+        /// <summary>
+        /// The TCP Client.
+        /// </summary>
+        public readonly ITcpNETClient TCPClient;
 
         /// <summary>
         /// Cached email.
@@ -46,7 +54,21 @@ namespace MSNPClient
         /// </summary>
         public Messenger()
         {
-            CommandManager = new CommandManager(Server, Port);
+            TCPClient = new TcpNETClient(new ParamsTcpClient()
+            {
+                Uri = Server,
+                Port = Port,
+                IsSSL = false
+            });
+            TCPClient.MessageEvent += TCPClient_MessageEvent;
+            TCPClient.ConnectAsync().GetAwaiter().GetResult();
+            CommandManager = new CommandManager(TCPClient);
+        }
+
+        private Task TCPClient_MessageEvent(object sender, Tcp.NET.Client.Events.Args.TcpMessageClientEventArgs args)
+        {
+            Console.WriteLine((args.MessageEventType == PHS.Networking.Enums.MessageEventType.Receive ? "S" : "C") + ": " + args.Message.Replace("\r\n", ""));
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -65,7 +87,7 @@ namespace MSNPClient
         /// <exception cref="InvalidAuthenticationException">Thrown when the specified credentials were not accepted by the server.</exception>
         public async Task Connect(string email, string password)
         {
-            this.email = email;   
+            this.email = email;
             var ver = await CommandManager.SendCommandAsync("VER", ProtocolVersion.ToString() + " CVR0");
             if (ver.ResultArgs.StartsWith("0 "))
             {
@@ -73,7 +95,7 @@ namespace MSNPClient
             }
 
             // CVR (with custom version... because why not?)
-            await CommandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR 4.20.Blaze.It MSMSGS " + email);
+            await CommandManager.SendCommandAsync("CVR", "0x0409 csharp 3.1 i386 MSNMSGR 5.6.7.8 MSMSGS " + email);
 
             if ((int)ProtocolVersion < 8)
             {
@@ -92,7 +114,7 @@ namespace MSNPClient
                 var susr = await CommandManager.SendCommandAsync("USR", inf.ResultArgs + " S " + (challenge + password).ToMD5().ToLower());
                 if (susr.Error && susr.Command == "911")
                     throw new InvalidAuthenticationException();
-                
+
             }
             else
             {
@@ -114,12 +136,13 @@ namespace MSNPClient
                     var loginGet = await client.GetAsync(passportUrls);
                     if (loginGet.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                         throw new InvalidAuthenticationException();
-                    
+
                     ticket = loginGet.Headers.GetValues("Authentication-Info").First().Split('\'')[1];
                 }
 
-                var susr = await CommandManager.SendCommandAsync("USR", "TWN S " + ticket); //Should probably check for OK
+                await CommandManager.SendCommandAsync("USR", "TWN S " + ticket, false); //Should probably check for OK
             }
+            //await CommandManager.SendCommandAsync("SYN", "0", false);
         }
 
         /// <summary>
@@ -130,7 +153,7 @@ namespace MSNPClient
         /// <returns></returns>
         public async Task SetPresence(PresenceStatus status, ClientIdentification identification = ClientIdentification.None)
         {
-            await CommandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + identification);
+            await CommandManager.SendCommandAsync("CHG", Presence.PresenceCodes[status] + " " + (uint)identification);
         }
 
         /// <summary>
